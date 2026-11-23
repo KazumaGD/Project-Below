@@ -46,8 +46,9 @@ namespace ProjectBelow.Editor
                 var player = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab, scene);
                 player.transform.position = new Vector3(0f, 0.45f, -7f);
 
-                CreateLayout();
-                CreateLighting();
+                Transform geometry = CreateLayout();
+                ExplorationInteractionSetup.AddLever();
+                ExplorationLightingSetup.ConfigureDungeon(geometry);
 
                 if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 {
@@ -101,6 +102,8 @@ namespace ProjectBelow.Editor
                 controller.FindProperty("_viewPivot").objectReferenceValue = view.transform;
                 controller.ApplyModifiedPropertiesWithoutUndo();
 
+                ExplorationInteractionSetup.AddToPlayer(player, camera);
+                ExplorationLightingSetup.AddPlayerLight(camera);
                 return PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
             finally
@@ -109,7 +112,7 @@ namespace ProjectBelow.Editor
             }
         }
 
-        private static void CreateLayout()
+        private static Transform CreateLayout()
         {
             Transform geometry = new GameObject("Graybox Geometry").transform;
             CreateCube("Floor", geometry, new Vector3(0.5f, -0.25f, -0.5f), new Vector3(12f, 0.5f, 18f));
@@ -143,6 +146,8 @@ namespace ProjectBelow.Editor
             CreateCube("Left Jamb", exit, new Vector3(0f, 1.05f, -0.65f), new Vector3(0.25f, 2.1f, 0.2f));
             CreateCube("Right Jamb", exit, new Vector3(0f, 1.05f, 0.65f), new Vector3(0.25f, 2.1f, 0.2f));
             CreateCube("Lintel", exit, new Vector3(0f, 2.2f, 0f), new Vector3(0.25f, 0.2f, 1.5f));
+
+            return geometry;
         }
 
         private static void CreateCube(string name, Transform parent, Vector3 position, Vector3 size)
@@ -152,15 +157,6 @@ namespace ProjectBelow.Editor
             cube.transform.SetParent(parent, false);
             cube.transform.localPosition = position;
             cube.transform.localScale = size;
-        }
-
-        private static void CreateLighting()
-        {
-            var light = new GameObject("Graybox Light").AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = 1.1f;
-            light.shadows = LightShadows.Soft;
-            light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
     }
 }
