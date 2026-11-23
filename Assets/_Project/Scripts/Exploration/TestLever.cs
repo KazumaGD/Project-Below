@@ -9,6 +9,7 @@ namespace ProjectBelow.Exploration
 
         [SerializeField] private Transform _handlePivot;
         [SerializeField] private Renderer _indicator;
+        [SerializeField] private AudioSource _switchSound;
         [SerializeField] private bool _isOn;
 
         private MaterialPropertyBlock _indicatorProperties;
@@ -23,6 +24,8 @@ namespace ProjectBelow.Exploration
 
             _isOn = !_isOn;
             ApplyState();
+            if (_switchSound != null && _switchSound.clip != null)
+                _switchSound.PlayOneShot(_switchSound.clip);
         }
 
         private void Awake()

@@ -53,7 +53,7 @@ namespace ProjectBelow.Editor
             hudSettings.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        public static void AddLever()
+        public static TestLever AddLever()
         {
             var lever = new GameObject("Test Lever");
             lever.transform.position = new Vector3(-2.65f, 1.35f, 7.72f);
@@ -71,10 +71,12 @@ namespace ProjectBelow.Editor
             var indicator = CreatePrimitive("Indicator", PrimitiveType.Sphere, lever.transform,
                 new Vector3(0.20f, 0.25f, -0.18f), Vector3.one * 0.15f);
 
-            var leverSettings = new SerializedObject(lever.AddComponent<TestLever>());
+            var component = lever.AddComponent<TestLever>();
+            var leverSettings = new SerializedObject(component);
             leverSettings.FindProperty("_handlePivot").objectReferenceValue = pivot;
             leverSettings.FindProperty("_indicator").objectReferenceValue = indicator.GetComponent<Renderer>();
             leverSettings.ApplyModifiedPropertiesWithoutUndo();
+            return component;
         }
 
         private static Image CreateImage(string name, Transform parent, Vector2 position, Vector2 size, Color color)

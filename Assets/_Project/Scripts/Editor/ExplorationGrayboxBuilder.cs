@@ -36,7 +36,8 @@ namespace ProjectBelow.Editor
 
             try
             {
-                GameObject playerPrefab = GetOrCreatePlayerPrefab(actions);
+                var audioSetup = new ExplorationAudioSetup();
+                GameObject playerPrefab = GetOrCreatePlayerPrefab(actions, audioSetup);
                 if (playerPrefab == null)
                 {
                     Debug.LogError($"Could not load or create the player prefab at {PlayerPrefabPath}.");
@@ -47,8 +48,9 @@ namespace ProjectBelow.Editor
                 player.transform.position = new Vector3(0f, 0.45f, -7f);
 
                 Transform geometry = CreateLayout();
-                ExplorationInteractionSetup.AddLever();
+                TestLever lever = ExplorationInteractionSetup.AddLever();
                 ExplorationLightingSetup.ConfigureDungeon(geometry);
+                audioSetup.AddSceneAudio(lever);
 
                 if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 {
@@ -65,7 +67,7 @@ namespace ProjectBelow.Editor
             }
         }
 
-        private static GameObject GetOrCreatePlayerPrefab(InputActionAsset actions)
+        private static GameObject GetOrCreatePlayerPrefab(InputActionAsset actions, ExplorationAudioSetup audioSetup)
         {
             if (File.Exists(PlayerPrefabPath))
                 return AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
@@ -104,6 +106,7 @@ namespace ProjectBelow.Editor
 
                 ExplorationInteractionSetup.AddToPlayer(player, camera);
                 ExplorationLightingSetup.AddPlayerLight(camera);
+                audioSetup.AddFootsteps(player);
                 return PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
             finally
