@@ -51,6 +51,7 @@ namespace ProjectBelow.Editor
                 TestLever lever = ExplorationInteractionSetup.AddLever();
                 ExplorationLightingSetup.ConfigureDungeon(geometry);
                 audioSetup.AddSceneAudio(lever);
+                ExplorationCombatSetup.AddEncounter(player, actions);
 
                 if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 {

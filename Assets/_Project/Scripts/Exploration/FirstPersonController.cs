@@ -22,6 +22,9 @@ namespace ProjectBelow.Exploration
         private float _pitch;
         private float _verticalSpeed;
         private bool _ownsCursor;
+        private bool _cursorCaptureEnabled = true;
+
+        public Transform ViewPivot => _viewPivot;
 
         public bool MovementEnabled
         {
@@ -33,6 +36,38 @@ namespace ProjectBelow.Exploration
         {
             get => _lookEnabled;
             set => _lookEnabled = value;
+        }
+
+        public bool CursorCaptureEnabled
+        {
+            get => _cursorCaptureEnabled;
+            set
+            {
+                if (_cursorCaptureEnabled == value)
+                    return;
+
+                _cursorCaptureEnabled = value;
+                if (value && isActiveAndEnabled)
+                    CaptureCursor();
+                else
+                    ReleaseCursor();
+            }
+        }
+
+        public void TurnViewTowards(Vector3 target, float degreesThisFrame)
+        {
+            Vector3 direction = target - _viewPivot.position;
+            if (direction.sqrMagnitude < 0.0001f)
+                return;
+
+            Vector3 horizontal = Vector3.ProjectOnPlane(direction, Vector3.up);
+            if (horizontal.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                    Quaternion.LookRotation(horizontal), degreesThisFrame);
+
+            float targetPitch = -Mathf.Atan2(direction.y, horizontal.magnitude) * Mathf.Rad2Deg;
+            _pitch = Mathf.MoveTowards(_pitch, Mathf.Clamp(targetPitch, -PitchLimit, PitchLimit), degreesThisFrame);
+            _viewPivot.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
         }
 
         private void Start()
@@ -69,18 +104,14 @@ namespace ProjectBelow.Exploration
 
         private void OnDisable()
         {
-            if (!_ownsCursor)
-                return;
-
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-            _ownsCursor = false;
+            ReleaseCursor();
         }
 
         private void Update()
         {
-            bool hasCapturedCursor = Application.isFocused && Cursor.lockState == CursorLockMode.Locked;
-            if (!hasCapturedCursor && Application.isFocused && Mouse.current?.leftButton.wasPressedThisFrame == true)
+            bool hasCapturedCursor = _cursorCaptureEnabled && Application.isFocused && Cursor.lockState == CursorLockMode.Locked;
+            if (_cursorCaptureEnabled && !hasCapturedCursor && Application.isFocused &&
+                Mouse.current?.leftButton.wasPressedThisFrame == true)
                 CaptureCursor();
 
             if (hasCapturedCursor && _lookEnabled)
@@ -114,12 +145,22 @@ namespace ProjectBelow.Exploration
 
         private void CaptureCursor()
         {
-            if (!Application.isFocused)
+            if (!_cursorCaptureEnabled || !Application.isFocused)
                 return;
 
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
             _ownsCursor = true;
+        }
+
+        private void ReleaseCursor()
+        {
+            if (!_ownsCursor)
+                return;
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            _ownsCursor = false;
         }
     }
 }
