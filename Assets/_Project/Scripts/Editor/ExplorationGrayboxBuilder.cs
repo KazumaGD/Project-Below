@@ -1,5 +1,6 @@
 using System.IO;
 using ProjectBelow.Exploration;
+using ProjectBelow.Inventory;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -51,7 +52,13 @@ namespace ProjectBelow.Editor
                 TestLever lever = ExplorationInteractionSetup.AddLever();
                 ExplorationLightingSetup.ConfigureDungeon(geometry);
                 audioSetup.AddSceneAudio(lever);
-                ExplorationCombatSetup.AddEncounter(player, actions);
+                var gameMode = ExplorationCombatSetup.AddEncounter(player, actions);
+                var inventory = player.GetComponent<PlayerInventory>();
+                if (inventory == null)
+                    inventory = player.AddComponent<PlayerInventory>();
+                ExplorationInventorySetup.AddToScene(gameMode, inventory);
+                ExplorationLootSetup.AddToScene(gameMode, inventory);
+                ExpeditionSetup.AddToDungeon(gameMode);
 
                 if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 {
@@ -108,6 +115,7 @@ namespace ProjectBelow.Editor
                 ExplorationInteractionSetup.AddToPlayer(player, camera);
                 ExplorationLightingSetup.AddPlayerLight(camera);
                 audioSetup.AddFootsteps(player);
+                player.AddComponent<PlayerInventory>();
                 return PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
             finally

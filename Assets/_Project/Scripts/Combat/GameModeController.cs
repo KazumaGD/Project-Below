@@ -1,5 +1,6 @@
 using System;
 using ProjectBelow.Exploration;
+using ProjectBelow.Inventory;
 using UnityEngine;
 
 namespace ProjectBelow.Combat
@@ -7,7 +8,12 @@ namespace ProjectBelow.Combat
     public enum GameMode
     {
         Exploration,
-        Combat
+        Combat,
+        Inventory,
+        Loot,
+        Hub,
+        ReturnConfirmation,
+        Dialogue
     }
 
     [DisallowMultipleComponent]
@@ -15,6 +21,7 @@ namespace ProjectBelow.Combat
     {
         [SerializeField] private FirstPersonController _player;
         [SerializeField] private PlayerInteraction _interaction;
+        [SerializeField] private GameMode _initialMode = GameMode.Exploration;
         [SerializeField, Min(1f)] private float _cameraTurnSpeed = 230f;
 
         private Transform _combatFocus;
@@ -25,11 +32,20 @@ namespace ProjectBelow.Combat
 
         public event Action<GameMode> ModeChanged;
         public GameMode CurrentMode { get; private set; } = GameMode.Exploration;
+        public LootContainer OpenLoot { get; private set; }
         public Transform PlayerView => _player != null ? _player.ViewPivot : null;
         public Transform PlayerRoot => _player != null ? _player.transform : null;
 
         private void Awake()
         {
+            if (_initialMode == GameMode.Hub)
+            {
+                CurrentMode = GameMode.Hub;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                return;
+            }
+
             if (PlayerView == null || _interaction == null)
             {
                 Debug.LogError("Assign the first-person player and their interaction component.", this);
@@ -42,19 +58,77 @@ namespace ProjectBelow.Combat
             if (CurrentMode != GameMode.Exploration || !isActiveAndEnabled || focus == null || PlayerView == null)
                 return false;
 
-            _previousMovement = _player.MovementEnabled;
-            _previousLook = _player.LookEnabled;
-            _previousInteraction = _interaction.InteractionEnabled;
-            _previousCursorCapture = _player.CursorCaptureEnabled;
-
-            CurrentMode = GameMode.Combat;
             _combatFocus = focus;
-            _player.MovementEnabled = false;
-            _player.LookEnabled = false;
-            _player.CursorCaptureEnabled = false;
-            _interaction.InteractionEnabled = false;
+            EnterMode(GameMode.Combat);
+            return true;
+        }
+
+        public bool TryOpenInventory()
+        {
+            if (CurrentMode != GameMode.Exploration || !isActiveAndEnabled || PlayerView == null)
+                return false;
+
+            EnterMode(GameMode.Inventory);
+            return true;
+        }
+
+        public void CloseInventory()
+        {
+            if (CurrentMode == GameMode.Inventory)
+                ReturnToExploration();
+        }
+
+        internal bool TryOpenLoot(LootContainer container)
+        {
+            if (CurrentMode != GameMode.Exploration || !isActiveAndEnabled || PlayerView == null || container == null)
+                return false;
+
+            OpenLoot = container;
+            EnterMode(GameMode.Loot);
+            return true;
+        }
+
+        public void CloseLoot()
+        {
+            if (CurrentMode != GameMode.Loot)
+                return;
+
+            OpenLoot = null;
+            ReturnToExploration();
+        }
+
+        internal bool TryOpenReturnConfirmation()
+        {
+            if (CurrentMode != GameMode.Exploration || !isActiveAndEnabled || PlayerView == null)
+                return false;
+
+            EnterMode(GameMode.ReturnConfirmation);
+            return true;
+        }
+
+        public void CloseReturnConfirmation()
+        {
+            if (CurrentMode == GameMode.ReturnConfirmation)
+                ReturnToExploration();
+        }
+
+        public bool TryOpenDialogue()
+        {
+            if (CurrentMode != GameMode.Hub || !isActiveAndEnabled)
+                return false;
+
+            CurrentMode = GameMode.Dialogue;
             ModeChanged?.Invoke(CurrentMode);
             return true;
+        }
+
+        public void CloseDialogue()
+        {
+            if (CurrentMode != GameMode.Dialogue)
+                return;
+
+            CurrentMode = GameMode.Hub;
+            ModeChanged?.Invoke(CurrentMode);
         }
 
         public void EndCombat()
@@ -62,8 +136,28 @@ namespace ProjectBelow.Combat
             if (CurrentMode != GameMode.Combat)
                 return;
 
-            CurrentMode = GameMode.Exploration;
             _combatFocus = null;
+            ReturnToExploration();
+        }
+
+        private void EnterMode(GameMode mode)
+        {
+            _previousMovement = _player.MovementEnabled;
+            _previousLook = _player.LookEnabled;
+            _previousInteraction = _interaction.InteractionEnabled;
+            _previousCursorCapture = _player.CursorCaptureEnabled;
+
+            CurrentMode = mode;
+            _player.MovementEnabled = false;
+            _player.LookEnabled = false;
+            _player.CursorCaptureEnabled = false;
+            _interaction.InteractionEnabled = false;
+            ModeChanged?.Invoke(CurrentMode);
+        }
+
+        private void ReturnToExploration()
+        {
+            CurrentMode = GameMode.Exploration;
             if (_player != null)
             {
                 _player.MovementEnabled = _previousMovement;
@@ -93,6 +187,10 @@ namespace ProjectBelow.Combat
         private void OnDisable()
         {
             EndCombat();
+            CloseInventory();
+            CloseLoot();
+            CloseReturnConfirmation();
+            CloseDialogue();
         }
     }
 }

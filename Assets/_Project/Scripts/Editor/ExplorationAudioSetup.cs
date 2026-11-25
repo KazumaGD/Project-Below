@@ -36,6 +36,8 @@ namespace ProjectBelow.Editor
             settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        internal AudioSource AddCombatSource(GameObject target) => AddSource(target, _sfx, 0.58f);
+
         public void AddSceneAudio(TestLever lever)
         {
             var root = new GameObject("Dungeon Audio").transform;
@@ -113,7 +115,7 @@ namespace ProjectBelow.Editor
             layer.FindPropertyRelative("_volume").floatValue = volume;
         }
 
-        private static AudioClip LoadClip(string name)
+        internal static AudioClip LoadClip(string name)
         {
             string path = $"{ClipFolder}/{name}.wav";
             var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);

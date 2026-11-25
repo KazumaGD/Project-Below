@@ -37,13 +37,18 @@ namespace ProjectBelow.UI
 
             string prompt = _interaction.CurrentPrompt;
             bool showPrompt = !string.IsNullOrEmpty(prompt);
-            if (showPrompt)
-            {
-                string binding = _interaction.GetInteractionBindingLabel();
-                _prompt.text = string.IsNullOrEmpty(binding) ? prompt : $"[{binding}]  {prompt}";
-            }
-
             _promptPanel.SetActive(showPrompt);
+            if (!showPrompt)
+                return;
+
+            string binding = _interaction.GetInteractionBindingLabel();
+            _prompt.text = string.IsNullOrEmpty(binding) ? prompt : $"[{binding}]  {prompt}";
+            var panel = (RectTransform)_promptPanel.transform;
+            var canvasRect = _prompt.canvas != null ? (RectTransform)_prompt.canvas.transform : null;
+            float maxWidth = canvasRect != null && canvasRect.rect.width > 0f ? canvasRect.rect.width * 0.85f : 600f;
+            float width = Mathf.Clamp(Mathf.Ceil(_prompt.preferredWidth) + 24f, Mathf.Min(314f, maxWidth), maxWidth);
+            panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+            panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(44f, Mathf.Ceil(_prompt.preferredHeight) + 12f));
         }
     }
 }

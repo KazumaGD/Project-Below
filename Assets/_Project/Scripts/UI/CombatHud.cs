@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using ProjectBelow.Combat;
+using ProjectBelow.Exploration;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace ProjectBelow.UI
@@ -13,7 +14,7 @@ namespace ProjectBelow.UI
         [SerializeField] private CombatController _combat;
         [SerializeField] private GameObject _content;
         [SerializeField] private Text _enemyName;
-        [SerializeField] private RectTransform _enemyHealth;
+        [SerializeField] private Text _enemyIntent;
         [SerializeField] private Text _playerHealth;
         [SerializeField] private Text _phase;
         [SerializeField] private Text _log;
@@ -21,17 +22,17 @@ namespace ProjectBelow.UI
         [SerializeField] private Button _attack;
         [SerializeField] private Button _defend;
         [SerializeField] private Button _flee;
-        [SerializeField] private Button _restart;
+        [SerializeField, FormerlySerializedAs("_restart")] private Button _returnToHub;
 
         private readonly Queue<string> _messages = new();
         private bool _bound;
-        private bool _restarting;
+        private ExpeditionFlow _expedition;
 
         private void OnEnable()
         {
-            if (_combat == null || _content == null || _enemyName == null || _enemyHealth == null
+            if (_combat == null || _content == null || _enemyName == null || _enemyIntent == null
                 || _playerHealth == null || _phase == null || _log == null
-                || _attack == null || _defend == null || _flee == null || _restart == null)
+                || _attack == null || _defend == null || _flee == null || _returnToHub == null)
             {
                 Debug.LogError("Assign the combat controller and the HUD widgets.", this);
                 enabled = false;
@@ -39,11 +40,12 @@ namespace ProjectBelow.UI
             }
 
             _bound = true;
+            _expedition = _combat.GetComponent<ExpeditionFlow>();
             _combat.Changed += OnCombatChanged;
             _attack.onClick.AddListener(Attack);
             _defend.onClick.AddListener(Defend);
             _flee.onClick.AddListener(Flee);
-            _restart.onClick.AddListener(RestartScene);
+            _returnToHub.onClick.AddListener(ReturnDefeated);
             Refresh();
         }
 
@@ -58,7 +60,7 @@ namespace ProjectBelow.UI
             _attack.onClick.RemoveListener(Attack);
             _defend.onClick.RemoveListener(Defend);
             _flee.onClick.RemoveListener(Flee);
-            _restart.onClick.RemoveListener(RestartScene);
+            _returnToHub.onClick.RemoveListener(ReturnDefeated);
             SelectControl(null);
             _content.SetActive(false);
         }
@@ -67,24 +69,15 @@ namespace ProjectBelow.UI
         private void Defend() => _combat.TryAct(CombatAction.Defend);
         private void Flee() => _combat.TryAct(CombatAction.Flee);
 
-        private void RestartScene()
+        private void ReturnDefeated()
         {
-            if (_restarting || _combat.Phase != CombatPhase.Defeat)
-                return;
-
-            string scenePath = gameObject.scene.path;
-            if (!Application.CanStreamedLevelBeLoaded(scenePath))
-            {
-                Debug.LogError($"The test scene is not enabled in the build scene list: {scenePath}", this);
-                return;
-            }
-
-            _restarting = true;
-            _restart.interactable = false;
-            SceneManager.LoadSceneAsync(scenePath, LoadSceneMode.Single);
+            if (_expedition == null)
+                Debug.LogError("The combat scene needs an ExpeditionFlow to return to the shelter.", this);
+            else if (_expedition.TryReturnDefeated())
+                _returnToHub.interactable = false;
         }
 
-        private void OnCombatChanged(CombatEvent combatEvent, int damage)
+        private void OnCombatChanged(CombatEvent combatEvent, int damage, bool blocked)
         {
             if (combatEvent == CombatEvent.Opened)
                 _messages.Clear();
@@ -96,7 +89,13 @@ namespace ProjectBelow.UI
                 CombatEvent.Defended => "Вы готовитесь отразить удар.",
                 CombatEvent.FleeFailed => "Сбежать не удалось.",
                 CombatEvent.EnemyAttack when damage == 0 => "Вы полностью блокируете удар.",
+                CombatEvent.EnemyAttack when blocked => $"Вы смягчаете удар. Урон: {damage}.",
                 CombatEvent.EnemyAttack => $"Противник наносит урон: {damage}.",
+                CombatEvent.EnemyPrepared => "Противник готовится к удару.",
+                CombatEvent.EnemyHeavyAttack when damage == 0 => "Вы блокируете мощный удар.",
+                CombatEvent.EnemyHeavyAttack when blocked => $"Вы смягчаете мощный удар. Урон: {damage}.",
+                CombatEvent.EnemyHeavyAttack => $"Мощный удар противника. Урон: {damage}.",
+                CombatEvent.EnemyRecovered => "Противник восстанавливается.",
                 CombatEvent.Victory => "Противник побеждён.",
                 CombatEvent.Escaped => "Вы успешно сбежали.",
                 CombatEvent.Defeat => "Вы потерпели поражение.",
@@ -128,12 +127,13 @@ namespace ProjectBelow.UI
             var player = _combat.Player;
             bool playerTurn = phase == CombatPhase.PlayerTurn;
             bool defeat = phase == CombatPhase.Defeat;
+            bool canReturn = _combat.CanReturnToHub && _expedition?.Session?.IsLoading != true;
             bool selectAttack = playerTurn && (!_content.activeSelf || !_attack.interactable);
-            bool selectRestart = defeat && !_restart.gameObject.activeSelf;
+            bool selectReturn = canReturn && !_returnToHub.gameObject.activeSelf;
 
             _content.SetActive(true);
             _enemyName.text = enemy.DisplayName;
-            _enemyHealth.anchorMax = new Vector2((float)enemy.State.Health / enemy.State.MaxHealth, 1f);
+            _enemyIntent.text = playerTurn ? FormatIntent(_combat.EnemyIntent) : string.Empty;
             _playerHealth.text = $"Ваше здоровье  {player.Health} / {player.MaxHealth}";
             _phase.text = phase switch
             {
@@ -151,14 +151,22 @@ namespace ProjectBelow.UI
             _attack.gameObject.SetActive(!defeat);
             _defend.gameObject.SetActive(!defeat);
             _flee.gameObject.SetActive(!defeat);
-            _restart.gameObject.SetActive(defeat);
+            _returnToHub.gameObject.SetActive(canReturn);
             if (selectAttack)
                 SelectControl(_attack.gameObject);
-            else if (selectRestart)
-                SelectControl(_restart.gameObject);
-            else if (!playerTurn && !defeat)
+            else if (selectReturn)
+                SelectControl(_returnToHub.gameObject);
+            else if (!playerTurn && !canReturn)
                 SelectControl(null);
         }
+
+        private static string FormatIntent(EnemyAction action) => action switch
+        {
+            EnemyAction.Prepare => "Намерение · подготовка",
+            EnemyAction.HeavyAttack => "Намерение · мощная атака",
+            EnemyAction.Recover => "Намерение · восстановление",
+            _ => "Намерение · обычная атака"
+        };
 
         private void SelectControl(GameObject control)
         {

@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7783048217546434599
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8301493956783416868}
+  - component: {fileID: 4922763006790497506}
+  m_Layer: 0
+  m_Name: Expedition Session
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8301493956783416868
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7783048217546434599}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4922763006790497506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7783048217546434599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7461a55e93f80d94ba78ba26fbbcf46c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectBelow.Core.ExpeditionSession
+  _maxHealth: 20
+  _resources:
+  - {fileID: 11400000, guid: abd2320f93ac62047ae51ed35e795195, type: 2}
+  - {fileID: 11400000, guid: e4c2ed0ce9a69514aacd406c8710383f, type: 2}
+  - {fileID: 11400000, guid: d27686f21c8cee0479ecdf56df1f7e33, type: 2}
+  _residents:
+  - {fileID: 11400000, guid: ca77662d5a3d33843be6176dc86b0adf, type: 2}
+  - {fileID: 11400000, guid: 2d43f6cf09b18f744a3b3e7c6bb791e7, type: 2}
+  - {fileID: 11400000, guid: f48a2c7bcbba61a43829cf3df716657d, type: 2}
+  _food: {fileID: 11400000, guid: e4c2ed0ce9a69514aacd406c8710383f, type: 2}
+  _rationRules:
+    _halfPortionCost: 1
+    _noFood:
+      _satiety: -28
+      _health: 0
+      _morale: -8
+    _halfPortion:
+      _satiety: -8
+      _health: 0
+      _morale: -2
+    _fullPortion:
+      _satiety: 18
+      _health: 4
+      _morale: 5
+    _starvationThreshold: 25
+    _starvationHealthLoss: 12
+    _starvationMoraleLoss: 5
+  _tasks:
+  - {fileID: 11400000, guid: 3137bde356df8d04e825ffc4a4893b8d, type: 2}
+  - {fileID: 11400000, guid: ecb98fec4794cb84087e25a36d9ffdec, type: 2}
+  - {fileID: 11400000, guid: 81d693d664165424cbdba199a58ca101, type: 2}
+  _facilities:
+  - {fileID: 11400000, guid: 2d961af1d3f9efe42a0140330c1787ee, type: 2}
+  - {fileID: 11400000, guid: dd7d950ee281b904192a5ddc01072f76, type: 2}
+  - {fileID: 11400000, guid: 3fd386226f8a9bf4d8a12b42c527a9fd, type: 2}
+  _constructionTask: {fileID: 11400000, guid: d45fb9715d66b4142862209044115cbc, type: 2}

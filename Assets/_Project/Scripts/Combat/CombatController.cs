@@ -1,12 +1,18 @@
 using System;
 using System.Collections;
+using ProjectBelow.Exploration;
 using UnityEngine;
 
 namespace ProjectBelow.Combat
 {
     public enum CombatPhase { Inactive, PlayerTurn, EnemyTurn, Victory, Escaped, Defeat }
     public enum CombatAction { Attack, Defend, Flee }
-    public enum CombatEvent { Opened, PlayerAttack, Defended, FleeFailed, EnemyAttack, Victory, Escaped, Defeat, Closed, PlayerTurn }
+    public enum CombatEvent
+    {
+        Opened, PlayerAttack, Defended, FleeFailed,
+        EnemyAttackWindup, EnemyAttack, EnemyPrepared, EnemyHeavyAttack, EnemyRecovered,
+        Victory, Escaped, Defeat, Closed, PlayerTurn
+    }
 
     [DisallowMultipleComponent, RequireComponent(typeof(GameModeController))]
     public sealed class CombatController : MonoBehaviour
@@ -19,17 +25,24 @@ namespace ProjectBelow.Combat
         [SerializeField, Min(0f)] private float _outcomeDelay = 1.2f;
 
         private GameModeController _gameMode;
+        private CombatFeedback _feedback;
         private Coroutine _pendingTurn;
+        private int _enemyTurnIndex;
 
-        public event Action<CombatEvent, int> Changed;
+        public event Action<CombatEvent, int, bool> Changed;
         public CombatPhase Phase { get; private set; }
         public CombatantState Player { get; private set; }
         public EnemyCombatant Enemy { get; private set; }
+        public EnemyAction EnemyIntent { get; private set; }
+        public bool CanReturnToHub { get; private set; }
 
         private void Awake()
         {
             _gameMode = GetComponent<GameModeController>();
-            Player = new CombatantState(_playerMaxHealth, _playerDamage);
+            _feedback = GetComponent<CombatFeedback>();
+            var expedition = GetComponent<ExpeditionFlow>();
+            int maxHealth = expedition != null && expedition.Session != null ? expedition.Session.MaxHealth : _playerMaxHealth;
+            Player = new CombatantState(maxHealth, _playerDamage);
         }
 
         private void OnEnable()
@@ -55,8 +68,8 @@ namespace ProjectBelow.Combat
                 return false;
 
             Enemy = enemy;
-            Phase = CombatPhase.PlayerTurn;
-            Publish(CombatEvent.Opened);
+            _enemyTurnIndex = 0;
+            BeginPlayerTurn(CombatEvent.Opened);
             return true;
         }
 
@@ -94,57 +107,99 @@ namespace ProjectBelow.Combat
         private void BeginEnemyTurn(CombatEvent action, int damage = 0, bool defending = false)
         {
             Phase = CombatPhase.EnemyTurn;
-            _pendingTurn = StartCoroutine(ResolveEnemyTurn(defending));
-            Publish(action, damage);
+            _pendingTurn = StartCoroutine(ResolveEnemyTurn(action, damage, defending));
         }
 
-        private IEnumerator ResolveEnemyTurn(bool defending)
+        private IEnumerator ResolveEnemyTurn(CombatEvent playerAction, int playerDamage, bool defending)
         {
-            yield return new WaitForSeconds(Mathf.Max(0f, _turnDelay));
-            if (Enemy == null || !Enemy.isActiveAndEnabled)
-            {
-                _pendingTurn = null;
-                _gameMode.EndCombat();
+            Publish(playerAction, playerDamage);
+            yield return WaitForFeedback(_turnDelay);
+            if (!CheckEnemy())
                 yield break;
+
+            (CombatEvent action, int damage) = EnemyIntent switch
+            {
+                EnemyAction.Prepare => (CombatEvent.EnemyPrepared, 0),
+                EnemyAction.HeavyAttack => (CombatEvent.EnemyHeavyAttack, Enemy.HeavyAttackDamage),
+                EnemyAction.Recover => (CombatEvent.EnemyRecovered, 0),
+                _ => (CombatEvent.EnemyAttack, Enemy.State.Damage)
+            };
+            if (damage > 0)
+            {
+                Publish(CombatEvent.EnemyAttackWindup);
+                yield return WaitForFeedback(0f);
+                if (!CheckEnemy())
+                    yield break;
             }
 
-            int damage = Enemy.State.Damage;
+            int attackDamage = damage;
             if (defending)
-                damage = Mathf.RoundToInt(damage * (1f - _defenseReductionPercent / 100f));
+                damage = (int)Math.Round(damage * ((100 - _defenseReductionPercent) / 100d));
 
+            bool blocked = damage < attackDamage;
             int applied = Player.TakeDamage(damage);
             if (Player.IsDefeated)
             {
+                Phase = CombatPhase.Defeat;
+                Publish(action, applied, blocked);
+                yield return WaitForFeedback(0f);
                 _pendingTurn = null;
-                Finish(CombatPhase.Defeat, CombatEvent.Defeat, CombatEvent.EnemyAttack, applied);
+                CanReturnToHub = true;
+                Publish(CombatEvent.Defeat);
                 yield break;
             }
 
-            Publish(CombatEvent.EnemyAttack, applied);
-            yield return new WaitForSeconds(Mathf.Max(0f, _turnDelay));
+            Publish(action, applied, blocked);
+            yield return WaitForFeedback(_turnDelay);
+            if (!CheckEnemy())
+                yield break;
             _pendingTurn = null;
+            BeginPlayerTurn(CombatEvent.PlayerTurn);
+        }
+
+        private bool CheckEnemy()
+        {
+            if (Enemy != null && Enemy.isActiveAndEnabled)
+                return true;
+
+            _pendingTurn = null;
+            _gameMode.EndCombat();
+            return false;
+        }
+
+        private void BeginPlayerTurn(CombatEvent combatEvent)
+        {
+            EnemyIntent = Enemy.GetAction(_enemyTurnIndex++);
             Phase = CombatPhase.PlayerTurn;
-            Publish(CombatEvent.PlayerTurn);
+            Publish(combatEvent);
         }
 
         private void Finish(CombatPhase phase, CombatEvent outcome, CombatEvent? action = null, int damage = 0)
         {
             Phase = phase;
-            if (phase != CombatPhase.Defeat)
-                _pendingTurn = StartCoroutine(ReturnToExploration(phase == CombatPhase.Victory));
-
-            if (action.HasValue)
-                Publish(action.Value, damage);
-            Publish(outcome);
+            _pendingTurn = StartCoroutine(ResolveOutcome(phase, outcome, action, damage));
         }
 
-        private IEnumerator ReturnToExploration(bool disableEnemy)
+        private IEnumerator ResolveOutcome(CombatPhase phase, CombatEvent outcome, CombatEvent? action, int damage)
         {
-            yield return new WaitForSeconds(Mathf.Max(0f, _outcomeDelay));
+            if (action.HasValue)
+            {
+                Publish(action.Value, damage);
+                yield return WaitForFeedback(0f);
+            }
+            Publish(outcome);
+            yield return WaitForFeedback(_outcomeDelay);
             _pendingTurn = null;
-            if (disableEnemy && Enemy != null)
-                Enemy.gameObject.SetActive(false);
+            if (phase == CombatPhase.Victory && Enemy != null)
+                Enemy.CompleteDefeat(_gameMode);
             _gameMode.EndCombat();
+        }
+
+        private IEnumerator WaitForFeedback(float minimumDelay)
+        {
+            double readyAt = Time.timeAsDouble + Mathf.Max(0f, minimumDelay);
+            while (Time.timeAsDouble < readyAt || (_feedback != null && _feedback.IsPlaying))
+                yield return null;
         }
 
         private void OnModeChanged(GameMode mode)
@@ -159,13 +214,14 @@ namespace ProjectBelow.Combat
                 StopCoroutine(_pendingTurn);
             _pendingTurn = null;
             Phase = CombatPhase.Inactive;
+            CanReturnToHub = false;
             Enemy = null;
             Publish(CombatEvent.Closed);
         }
 
-        private void Publish(CombatEvent combatEvent, int damage = 0)
+        private void Publish(CombatEvent combatEvent, int damage = 0, bool blocked = false)
         {
-            Changed?.Invoke(combatEvent, damage);
+            Changed?.Invoke(combatEvent, damage, blocked);
         }
     }
 }

@@ -567,6 +567,7 @@ GameObject:
   - component: {fileID: 3151620991010206889}
   - component: {fileID: 4061926532860657321}
   - component: {fileID: 5900245031417366181}
+  - component: {fileID: 5117899963735540991}
   m_Layer: 0
   m_Name: ExplorationPlayer
   m_TagString: Untagged
@@ -794,6 +795,19 @@ MonoBehaviour:
   _stepDistance: 1.65
   _volumeVariation: 0.14
   _pitchRange: {x: 0.94, y: 1.06}
+--- !u!114 &5117899963735540991
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6231260141504545882}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d316415741209c24fbff7c4997c448b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectBelow.Inventory.PlayerInventory
+  _capacity: 12
 --- !u!1 &9209362170676356572
 GameObject:
   m_ObjectHideFlags: 0

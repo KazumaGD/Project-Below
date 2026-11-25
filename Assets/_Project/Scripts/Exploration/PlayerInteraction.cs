@@ -18,6 +18,7 @@ namespace ProjectBelow.Exploration
         public event Action PresentationChanged;
         public bool IsInteractionActive { get; private set; }
         public string CurrentPrompt { get; private set; }
+        internal float InteractionDistance => _interactionDistance;
 
         public bool InteractionEnabled
         {
